@@ -72,9 +72,6 @@ namespace ipn
 			zmq::message_t request_msg(request.size());
 			packable_message::pack(request, request_msg);
 
-			Request r;
-			packable_message::unpack(request_msg, r);
-
 			int retries_left = retry_count;
 			client.send(request_msg, zmq::send_flags::none);
 
@@ -87,7 +84,6 @@ namespace ipn
 
 				//  If we got a reply, process it
 				if (items[0].revents & ZMQ_POLLIN) {
-					//  We got a reply from the server, must match sequence
 					Response res;
 					auto result = receive(client, res);
 					error_t error;
@@ -99,7 +95,6 @@ namespace ipn
 					return result_t<Response>(res, error);
 				}
 				else if (--retries_left == 0) {
-
 					error_t error;
 					error.error_no = -2;
 					error.description = "server seems to be offline, abandoning.";
@@ -108,11 +103,7 @@ namespace ipn
 					return result_t<Response>(res, error);
 				}
 				else {
-					std::cout << "W: no response from server, retrying..." << std::endl;
-					//  Old socket will be confused; close it and open a new one
 					client = create_socket(*shared_ctx(), endpoint);
-
-					//  Send request again, on new socket
 					client.send(request_msg, zmq::send_flags::none);
 				}
 			}

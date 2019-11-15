@@ -9,8 +9,7 @@ int main(int argc, char *argv[])
 {
 	try {
 		if (argc != 2) {
-			std::cerr << "Usage: stream_server <file>\n";
-			std::cerr << "*** WARNING: existing file is removed ***\n";
+			std::cerr << "Usage: subscriber <file>\n";
 			return 1;
 		}
 
