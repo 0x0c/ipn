@@ -1,5 +1,5 @@
-example/server/ipn_server
-example/ipn_client/ipn_client
+example/publisher/publisher
+example/subscriber/subscriber
 
 *.dylib
 
