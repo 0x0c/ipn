@@ -10,6 +10,11 @@ namespace m2d
 {
 namespace ipn
 {
+	namespace topic
+	{
+		static const std::string all = "";
+	}
+
 	template <typename T>
 	void pack(const T &data, zmq::message_t &msg)
 	{
@@ -91,25 +96,61 @@ namespace ipn
 	// 	}
 	// }
 
-	class response
+	class packable_object
+	{
+	public:
+		std::string name;
+		MSGPACK_DEFINE(name);
+		packable_object() {}
+
+		msgpack::sbuffer packed_data() const
+		{
+			msgpack::sbuffer packed;
+			msgpack::pack(packed, *this);
+			return packed;
+		};
+
+		void *data() const
+		{
+			return packed_data().data();
+		}
+
+		size_t size() const
+		{
+			return packed_data().size();
+		}
+	};
+
+	class response : public packable_object
 	{
 	public:
 		std::string message;
 		MSGPACK_DEFINE(message);
-		response() {}
+		response()
+		    : packable_object()
+		{
+		}
+
 		response(const std::string &message)
-		    : message(message)
+		    : packable_object()
+		    , message(message)
 		{
 		}
 	};
 
-	class request
+	class request : public packable_object
 	{
 	public:
 		std::string message;
 		MSGPACK_DEFINE(message);
+		request()
+		    : packable_object()
+		{
+		}
+
 		request(const std::string &message)
-		    : message(message)
+		    : packable_object()
+		    , message(message)
 		{
 		}
 	};
@@ -123,24 +164,37 @@ namespace ipn
 	public:
 		client(const std::string &endpoint)
 		{
+			zmq::context_t ctx;
 			req = zmq::socket_t(*shared_ctx(), zmq::socket_type::req);
 			req.connect(ipn::rep_endpoint(endpoint));
-			// req.setsockopt(ZMQ_RCVTIMEO, 500, sizeof(int));
+			req.setsockopt(ZMQ_RCVTIMEO, 500);
 		}
 
-		void send(const Request data)
+		void send(const Request &request)
 		{
+			zmq::message_t request_msg(request.size());
+			pack(request, request_msg);
+			req.send(request_msg, zmq::send_flags::none);
 		}
 
-		void receive(Response &data)
+		void send(const Request &data, std::function<void(Response)> handler)
+		{
+			send(data);
+			Response res;
+			receive(res);
+			handler(res);
+		}
+
+        zmq::detail::recv_result_t receive(Response &data)
 		{
 			zmq::message_t data_msg;
-			req.recv(&data_msg);
+			auto result = req.recv(data_msg);
 			unpack<Response>(data_msg, data);
+			return result;
 		}
 	};
 
-	template <typename T>
+	template <typename Request, typename Response>
 	class service
 	{
 	private:
@@ -152,27 +206,30 @@ namespace ipn
 		{
 		}
 
-		void run()
+		void run(std::function<Response(Request)> handler)
 		{
 			zmq::socket_t rep(*shared_ctx(), zmq::socket_type::rep);
 			rep.bind(rep_endpoint(this->endpoint_));
 
 			while (true) {
 				zmq::message_t msg;
-				auto result = rep.recv(&msg);
+				auto result = rep.recv(msg);
 				if (result) {
-					auto res = response("available");
-					zmq::message_t reply;
-					pack(res, reply);
-					rep.send(reply, zmq::send_flags::none);
+					Request req;
+					unpack<Request>(msg, req);
+
+					auto res = handler(req);
+					zmq::message_t reply_msg;
+					pack(res, reply_msg);
+					rep.send(reply_msg, zmq::send_flags::none);
 				}
 			}
 		}
 
-		void async_run()
+		void async_run(std::function<Response(Request)> handler)
 		{
 			std::thread t([&] {
-				this->run();
+				this->run(handler);
 			});
 			t.detach();
 		}
@@ -182,14 +239,21 @@ namespace ipn
 	class publisher
 	{
 	private:
-		zmq::socket_t pub;
+		zmq::socket_t *pub;
 		std::string endpoint_;
+		service<request, response> *s;
 
 	public:
 		publisher(const std::string &endpoint)
 		{
-			pub = zmq::socket_t(*shared_ctx(), zmq::socket_type::pub);
-			pub.bind(pub_endpoint(endpoint));
+			pub = new zmq::socket_t(*shared_ctx(), zmq::socket_type::pub);
+			pub->bind(pub_endpoint(endpoint));
+
+			s = new service<request, response>(endpoint);
+			s->async_run([](request req) {
+				response res("available");
+				return res;
+			});
 
 			// std::thread t([&] {
 			// 	zmq::socket_t rep(*shared_ctx(), zmq::socket_type::rep);
@@ -209,6 +273,12 @@ namespace ipn
 			// t.detach();
 		}
 
+		~publisher()
+		{
+			delete pub;
+			delete s;
+		}
+
 		void send(const std::string &topic, const T &data)
 		{
 			zmq::message_t topic_msg(topic.size());
@@ -217,8 +287,8 @@ namespace ipn
 			zmq::message_t data_msg(data.size());
 			pack(data, data_msg);
 
-			pub.send(topic_msg, zmq::send_flags::sndmore);
-			pub.send(data_msg);
+			pub->send(topic_msg, zmq::send_flags::sndmore);
+			pub->send(data_msg, zmq::send_flags::none);
 		}
 	};
 
@@ -243,17 +313,18 @@ namespace ipn
 			delete c;
 		}
 
-		bool is_publisher_available(const std::string &endpoint)
+		bool is_publisher_available()
 		{
 			auto ping = request("ping");
 			c->send(ping);
 
 			response res;
-			c->receive(res);
-			if (res.message.size()) {
+			try {
+				c->receive(res);
 				return true;
+			} catch (zmq::error_t e) {
+				return false;
 			}
-			return false;
 		}
 
 		void subscribe(const std::string &topic, std::function<void(T)> handler)
@@ -265,8 +336,8 @@ namespace ipn
 
 				while (true) {
 					zmq::message_t topic_msg, data_msg;
-					sub.recv(&topic_msg);
-					sub.recv(&data_msg);
+					sub.recv(topic_msg);
+					sub.recv(data_msg);
 
 					const std::string topic(static_cast<const char *>(topic_msg.data()), topic_msg.size());
 

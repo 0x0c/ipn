@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 11)
 add_executable(publisher main.cpp)
 
 find_package(cppzmq REQUIRED)
+find_package(msgpack REQUIRED)
+
 target_link_libraries(publisher cppzmq)
 
 target_include_directories(publisher INTERFACE ../../include)
