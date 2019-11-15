@@ -2,5 +2,5 @@
 
 ## Requirements
 
-- msgpack =< 3.2.0
-- zmq =< 4.0.0
+- msgpack >= 3.2.0
+- zmq >= 4.0.0
