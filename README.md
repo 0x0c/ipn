@@ -2,5 +2,5 @@
 
 ## Requirements
 
-- msgpack 3.2.0
-- Boost 1.70.0
+- msgpack =< 3.2.0
+- zmq =< 4.0.0
