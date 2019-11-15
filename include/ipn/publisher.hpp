@@ -17,7 +17,6 @@ namespace ipn
 	{
 	private:
 		zmq::socket_t pub;
-		std::string endpoint_;
 
 	public:
 		publisher(const std::string &endpoint)

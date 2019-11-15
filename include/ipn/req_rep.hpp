@@ -6,14 +6,14 @@ namespace m2d
 {
 namespace ipn
 {
-	class response : public packable_message::abstract_message
+	class simple_response : public packable_message::abstract_message
 	{
 	public:
 		std::string message;
 		MSGPACK_DEFINE(message);
 
-		response() {}
-		response(std::string message)
+		simple_response() {}
+		simple_response(std::string message)
 		    : message(message)
 		{
 		}
@@ -36,13 +36,13 @@ namespace ipn
 		}
 	};
 
-	class request : public packable_message::abstract_message
+	class simple_request : public packable_message::abstract_message
 	{
 	public:
 		std::string message;
 		MSGPACK_DEFINE(message);
-		request() {}
-		request(std::string message)
+		simple_request() {}
+		simple_request(std::string message)
 		    : message(message)
 		{
 		}

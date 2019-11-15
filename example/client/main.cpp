@@ -10,23 +10,23 @@ int main(int argc, char *argv[])
 {
 	try {
 		if (argc != 2) {
-			std::cerr << "Usage: stream_server <file>\n";
-			std::cerr << "*** WARNING: existing file is removed ***\n";
+			std::cerr << "Usage: client <file>\n";
 			return 1;
 		}
 
-		auto client = ipn::client<ipn::request, message>(argv[1]);
+		auto client = ipn::client<ipn::simple_request, ipn::simple_response>(argv[1]);
 		int sequence = 5;
 		while (sequence--) {
-			auto req = ipn::request("hello");
-			client.send(req, [](message msg, bool success) {
-				if (success) {
-					std::cout << "response: " << msg.text << std::endl;
-				}
-				else {
-					std::cout << "E: malformed reply from server: " << std::endl;
-				}
-			});
+			auto req = ipn::simple_request("hello");
+			ipn::result_t<ipn::simple_response> result = client.send(req);
+
+			if (result.err.error_no) {
+				std::cout << "E: " << result.err.description << std::endl;
+			}
+			else {
+				ipn::simple_response &msg = result.res;
+				std::cout << "response: " << msg.message << std::endl;
+			}
 			std::this_thread::sleep_for(std::chrono::seconds(1));
 		}
 	} catch (std::exception &e) {

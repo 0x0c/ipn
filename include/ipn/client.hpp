@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <iostream>
+#include <tuple>
 
 #include <msgpack.hpp>
 #include <zmq.hpp>
@@ -13,13 +14,31 @@ namespace m2d
 {
 namespace ipn
 {
+	struct error_t
+	{
+		int error_no = 0;
+		std::string description = "";
+	};
+
+	template <typename Response>
+	class result_t
+	{
+	public:
+		Response res;
+		error_t err;
+		result_t(Response res, error_t err)
+		    : res(res)
+		    , err(err)
+		{
+		}
+	};
+
 	template <typename Request, typename Response>
 	class client
 	{
 	private:
 		static zmq::socket_t create_socket(zmq::context_t &context, std::string endpoint)
 		{
-			std::cout << "I: connecting to server..." << std::endl;
 			zmq::socket_t client(context, ZMQ_REQ);
 			client.connect(endpoint);
 
@@ -34,7 +53,6 @@ namespace ipn
 			zmq::message_t data_msg;
 			auto result = client.recv(data_msg);
 			if (result.value()) {
-				std::cout << "valid" << std::endl;
 				packable_message::unpack<Response>(data_msg, data);
 			}
 
@@ -48,7 +66,7 @@ namespace ipn
 		{
 		}
 
-		void send(const Request &request, std::function<void(Response, bool)> handler, int timeout_msec = 500, int retry_count = 1)
+		result_t<Response> send(const Request &request, int timeout_msec = 500, int retry_count = 1)
 		{
 			zmq::socket_t client = create_socket(*shared_ctx(), endpoint);
 			zmq::message_t request_msg(request.size());
@@ -60,8 +78,7 @@ namespace ipn
 			int retries_left = retry_count;
 			client.send(request_msg, zmq::send_flags::none);
 
-			bool expect_reply = true;
-			while (expect_reply) {
+			while (true) {
 				//  Poll socket for a reply, with timeout
 				zmq::pollitem_t items[] = {
 					{ static_cast<void *>(client), 0, ZMQ_POLLIN, 0 }
@@ -73,14 +90,22 @@ namespace ipn
 					//  We got a reply from the server, must match sequence
 					Response res;
 					auto result = receive(client, res);
-					handler(res, result.value() > 0);
-					expect_reply = false;
-					break;
+					error_t error;
+					if (result.value() == 0) {
+						error.error_no = -1;
+						error.description = "malformed reply from server.";
+					}
+
+					return result_t<Response>(res, error);
 				}
 				else if (--retries_left == 0) {
-					std::cout << "E: server seems to be offline, abandoning" << std::endl;
-					expect_reply = false;
-					break;
+
+					error_t error;
+					error.error_no = -2;
+					error.description = "server seems to be offline, abandoning.";
+
+					Response res;
+					return result_t<Response>(res, error);
 				}
 				else {
 					std::cout << "W: no response from server, retrying..." << std::endl;
