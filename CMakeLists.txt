@@ -21,6 +21,5 @@ install(TARGETS ipn
 # Add sub-directories
 add_subdirectory(example/publisher)
 add_subdirectory(example/subscriber)
-add_subdirectory(example/monitoring)
 add_subdirectory(example/service)
 add_subdirectory(example/client)
