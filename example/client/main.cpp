@@ -20,11 +20,11 @@ int main(int argc, char *argv[])
 			auto req = ipn::simple_request("hello");
 			ipn::result_t<ipn::simple_response> result = client.send(req);
 
-			if (result.err.error_no) {
-				std::cout << "E: " << result.err.description << std::endl;
+			if (result.error) {
+				std::cout << "E: " << result.error->description << std::endl;
 			}
 			else {
-				ipn::simple_response &msg = result.res;
+				ipn::simple_response &msg = *(result.response);
 				std::cout << "response: " << msg.message << std::endl;
 			}
 			std::this_thread::sleep_for(std::chrono::seconds(1));

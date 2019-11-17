@@ -7,6 +7,8 @@
 #include <msgpack.hpp>
 #include <zmq.hpp>
 
+#include <boost/optional.hpp>
+
 #include "constant.hpp"
 #include "packable_message.hpp"
 
@@ -16,7 +18,7 @@ namespace ipn
 {
 	struct error_t
 	{
-		int error_no = 0;
+		int err_no = 0;
 		std::string description = "";
 	};
 
@@ -24,11 +26,17 @@ namespace ipn
 	class result_t
 	{
 	public:
-		Response res;
-		error_t err;
-		result_t(Response res, error_t err)
-		    : res(res)
-		    , err(err)
+		boost::optional<Response> response;
+		boost::optional<error_t> error;
+		result_t(Response response)
+		    : response(response)
+		    , error(boost::none)
+		{
+		}
+
+		result_t(error_t error)
+		    : response(boost::none)
+		    , error(error)
 		{
 		}
 	};
@@ -88,19 +96,19 @@ namespace ipn
 					auto result = receive(client, res);
 					error_t error;
 					if (result.value() == 0) {
-						error.error_no = -1;
+						error.err_no = -1;
 						error.description = "malformed reply from server.";
+						return result_t<Response>(error);
 					}
 
-					return result_t<Response>(res, error);
+					return result_t<Response>(res);
 				}
 				else if (--retries_left == 0) {
 					error_t error;
-					error.error_no = -2;
+					error.err_no = -2;
 					error.description = "server seems to be offline, abandoning.";
 
-					Response res;
-					return result_t<Response>(res, error);
+					return result_t<Response>(error);
 				}
 				else {
 					client = create_socket(*shared_ctx(), endpoint);

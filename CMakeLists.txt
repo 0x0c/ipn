@@ -9,6 +9,7 @@ include_directories("${CMAKE_SOURCE_DIR}/include")
 
 find_package(cppzmq REQUIRED)
 find_package(msgpack REQUIRED)
+find_package(boost REQUIRED)
 
 target_include_directories(ipn INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(ipn ${msgpack_LIBRARIES})
