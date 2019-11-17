@@ -17,12 +17,12 @@ namespace ipn
 		return &ctx;
 	};
 
-	static inline const std::string broaker_endpoint(const std::string &domain, const std::string &protocol = "ipc://")
+	static inline const std::string broker_endpoint(const std::string &domain, const std::string &protocol = "ipc://")
 	{
 		std::string new_endpoint;
 		new_endpoint += protocol;
 		new_endpoint += domain;
-		new_endpoint += ".broaker";
+		new_endpoint += ".broker";
 		return new_endpoint;
 	}
 
