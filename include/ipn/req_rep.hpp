@@ -6,7 +6,7 @@ namespace m2d
 {
 namespace ipn
 {
-	class simple_response_t : public packable_message::abstract_message
+	class simple_response_t : public packable_message::abstract_message_t
 	{
 	public:
 		std::string message;
@@ -36,7 +36,7 @@ namespace ipn
 		}
 	};
 
-	class simple_request_t : public packable_message::abstract_message
+	class simple_request_t : public packable_message::abstract_message_t
 	{
 	public:
 		std::string message;
