@@ -1,6 +1,8 @@
 #pragma once
 
-class message
+#include <ipn.hpp>
+
+class message : m2d::ipn::packable_message::abstract_message_t
 {
 public:
 	std::string text;

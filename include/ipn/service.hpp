@@ -24,6 +24,8 @@ namespace ipn
 		service(const std::string &endpoint)
 		    : endpoint(ipn::rep_endpoint(endpoint))
 		{
+			static_assert(std::is_base_of<packable_message::abstract_message_t, Request>::value, "Request not derived from packable_message");
+			static_assert(std::is_base_of<packable_message::abstract_message_t, Response>::value, "Response not derived from packable_message");
 		}
 
 		void run(std::function<Response(Request &)> handler)
@@ -54,6 +56,5 @@ namespace ipn
 			//			t.detach();
 		}
 	};
-
 }
 }

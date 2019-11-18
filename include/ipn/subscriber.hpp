@@ -23,6 +23,7 @@ namespace ipn
 		subscriber(const std::string &endpoint)
 		    : endpoint_(endpoint)
 		{
+			static_assert(std::is_base_of<packable_message::abstract_message_t, T>::value, "T not derived from packable_message");
 		}
 
 		void subscribe(const std::string &topic, std::function<void(T)> handler)

@@ -2,6 +2,8 @@
 
 #include <ipn.hpp>
 
+#include "../req_rep.hpp"
+
 using namespace m2d;
 
 int main(int argc, char *argv[])
@@ -12,17 +14,17 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		auto client = ipn::client<ipn::simple_request_t, ipn::simple_response_t>(argv[1]);
+		auto client = ipn::client<simple_request_t, simple_response_t>(argv[1]);
 		int sequence = 5;
 		while (sequence--) {
-			auto req = ipn::simple_request_t("hello");
-			ipn::result_t<ipn::simple_response_t> result = client.send(req);
+			auto req = simple_request_t("hello");
+			ipn::result_t<simple_response_t> result = client.send(req);
 
 			if (result.error) {
 				std::cout << "E: " << result.error->description << std::endl;
 			}
 			else {
-				ipn::simple_response_t &msg = *(result.response);
+				simple_response_t &msg = *(result.response);
 				std::cout << "response: " << msg.message << std::endl;
 			}
 			std::this_thread::sleep_for(std::chrono::seconds(1));

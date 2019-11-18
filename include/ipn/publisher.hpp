@@ -21,6 +21,7 @@ namespace ipn
 	public:
 		publisher(const std::string &endpoint)
 		{
+			static_assert(std::is_base_of<packable_message::abstract_message_t, T>::value, "T not derived from packable_message");
 			pub = zmq::socket_t(*shared_ctx(), zmq::socket_type::pub);
 			pub.bind(pub_endpoint(endpoint));
 		}

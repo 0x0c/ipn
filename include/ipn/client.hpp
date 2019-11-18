@@ -32,6 +32,7 @@ namespace ipn
 		    : response(response)
 		    , error(boost::none)
 		{
+			static_assert(std::is_base_of<packable_message::abstract_message_t, Response>::value, "Response not derived from packable_message");
 		}
 
 		result_t(error_t error)
@@ -72,6 +73,8 @@ namespace ipn
 		client(const std::string &endpoint)
 		    : endpoint(ipn::rep_endpoint(endpoint))
 		{
+			static_assert(std::is_base_of<packable_message::abstract_message_t, Response>::value, "Response not derived from packable_message");
+			static_assert(std::is_base_of<packable_message::abstract_message_t, Request>::value, "Request not derived from packable_message");
 		}
 
 		result_t<Response> send(const Request &request, int timeout_msec = 500, int retry_count = 1)
