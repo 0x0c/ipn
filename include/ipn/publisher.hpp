@@ -29,7 +29,7 @@ namespace ipn
 		void send(const std::string &topic, const T &data)
 		{
 			zmq::message_t topic_msg(topic.size());
-			packable_message::pack(topic, topic_msg);
+			std::memcpy(topic_msg.data(), topic.c_str(), topic.size());
 
 			zmq::message_t data_msg(data.size());
 			packable_message::pack(data, data_msg);
