@@ -47,14 +47,6 @@ namespace ipn
 				}
 			}
 		}
-
-		void async_run(std::function<Response(Request)> handler)
-		{
-			//			std::thread t([&] {
-			this->run(handler);
-			//			});
-			//			t.detach();
-		}
 	};
 }
 }
