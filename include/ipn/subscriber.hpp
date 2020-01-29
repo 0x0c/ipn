@@ -3,11 +3,10 @@
 #include <functional>
 #include <thread>
 
-#include <msgpack.hpp>
+#include <google/protobuf/message.h>
 #include <zmq.hpp>
 
 #include "constant.hpp"
-#include "packable_message.hpp"
 
 namespace m2d
 {
@@ -23,7 +22,7 @@ namespace ipn
 		subscriber(const std::string &endpoint)
 		    : endpoint_(endpoint)
 		{
-			static_assert(std::is_base_of<packable_message::abstract_message_t, T>::value, "T not derived from packable_message");
+			static_assert(std::is_base_of<google::protobuf::Message, T>::value, "T not derived from google::protobuf::Message");
 		}
 
 		void subscribe(const std::string &topic, std::function<void(T)> handler)
@@ -38,10 +37,11 @@ namespace ipn
 					sub.recv(topic_msg);
 					sub.recv(data_msg);
 
-					const std::string topic(static_cast<const char *>(topic_msg.data()), topic_msg.size());
+					const std::string topic_str(static_cast<const char *>(topic_msg.data()), topic_msg.size());
+					const std::string data_str(static_cast<const char *>(data_msg.data()), data_msg.size());
 
 					T data;
-					packable_message::unpack<T>(data_msg, data);
+					data.ParseFromString(data_str);
 					handler(data);
 				}
 			});

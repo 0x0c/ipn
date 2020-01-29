@@ -1,7 +1,7 @@
 #include <iostream>
 #include <ipn.hpp>
 
-#include "../message.hpp"
+#include "ReqRep.pb.h"
 
 using namespace m2d;
 
@@ -13,9 +13,9 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		auto sub = ipn::subscriber<message>(argv[1]);
-		sub.subscribe(ipn::topic::all, [](message msg) {
-			std::cout << "received " << msg.text << std::endl;
+		auto sub = ipn::subscriber<example::message>(argv[1]);
+		sub.subscribe(ipn::topic::all, [](example::message msg) {
+			std::cout << "received " << msg.text() << std::endl;
 		});
 		while (true) {
 		}

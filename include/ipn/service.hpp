@@ -4,11 +4,11 @@
 #include <iostream>
 #include <thread>
 
+#include <google/protobuf/message.h>
 #include <msgpack.hpp>
 #include <zmq.hpp>
 
 #include "constant.hpp"
-#include "packable_message.hpp"
 
 namespace m2d
 {
@@ -24,8 +24,8 @@ namespace ipn
 		service(const std::string &endpoint)
 		    : endpoint(ipn::rep_endpoint(endpoint))
 		{
-			static_assert(std::is_base_of<packable_message::abstract_message_t, Request>::value, "Request not derived from packable_message");
-			static_assert(std::is_base_of<packable_message::abstract_message_t, Response>::value, "Response not derived from packable_message");
+			static_assert(std::is_base_of<google::protobuf::Message, Request>::value, "Request not derived from google::protobuf::Message");
+			static_assert(std::is_base_of<google::protobuf::Message, Response>::value, "Response not derived from google::protobuf::Message");
 		}
 
 		void run(std::function<Response(Request &)> handler)
@@ -38,11 +38,17 @@ namespace ipn
 				auto result = rep.recv(msg);
 				if (result) {
 					Request req;
-					packable_message::unpack<Request>(msg, req);
+					auto data_msg = static_cast<const char *>(msg.data());
+					std::string data_str(data_msg, msg.size());
+					req.ParseFromString(data_str);
 
 					auto res = handler(req);
-					zmq::message_t reply_msg(res.size());
-					packable_message::pack(res, reply_msg);
+
+					// pack to zmq::message_t
+					auto serialized_string = res.SerializeAsString();
+					auto size = serialized_string.size() * sizeof(std::string::value_type);
+					zmq::message_t reply_msg(size);
+					std::memcpy(reply_msg.data(), serialized_string.c_str(), size);
 					rep.send(reply_msg, zmq::send_flags::none);
 				}
 			}

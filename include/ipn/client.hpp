@@ -4,13 +4,12 @@
 #include <iostream>
 #include <tuple>
 
+#include <boost/optional.hpp>
+#include <google/protobuf/message.h>
 #include <msgpack.hpp>
 #include <zmq.hpp>
 
-#include <boost/optional.hpp>
-
 #include "constant.hpp"
-#include "packable_message.hpp"
 
 namespace m2d
 {
@@ -32,7 +31,7 @@ namespace ipn
 		    : response(response)
 		    , error(boost::none)
 		{
-			static_assert(std::is_base_of<packable_message::abstract_message_t, Response>::value, "Response not derived from packable_message");
+			static_assert(std::is_base_of<google::protobuf::Message, Response>::value, "Response not derived from packable_message");
 		}
 
 		result_t(error_t error)
@@ -61,11 +60,13 @@ namespace ipn
 		{
 			zmq::message_t data_msg;
 			auto result = client.recv(data_msg);
+			auto parsed = false;
 			if (result.value()) {
-				packable_message::unpack<Response>(data_msg, data);
+				const std::string data_str(static_cast<const char *>(data_msg.data()), data_msg.size());
+				parsed = data.ParseFromString(data_str);
 			}
 
-			return result;
+			return (result.value() > 0) & parsed;
 		}
 
 	public:
@@ -73,15 +74,18 @@ namespace ipn
 		client(const std::string &endpoint)
 		    : endpoint(ipn::rep_endpoint(endpoint))
 		{
-			static_assert(std::is_base_of<packable_message::abstract_message_t, Response>::value, "Response not derived from packable_message");
-			static_assert(std::is_base_of<packable_message::abstract_message_t, Request>::value, "Request not derived from packable_message");
+			static_assert(std::is_base_of<google::protobuf::Message, Response>::value, "Response not derived from google::protobuf::Message");
+			static_assert(std::is_base_of<google::protobuf::Message, Request>::value, "Request not derived from google::protobuf::Message");
 		}
 
 		result_t<Response> send(const Request &request, int timeout_msec = 500, int retry_count = 1)
 		{
 			zmq::socket_t client = create_socket(*shared_ctx(), endpoint);
-			zmq::message_t request_msg(request.size());
-			packable_message::pack(request, request_msg);
+			// pack to zmq::message_t
+			auto serialized_string = request.SerializeAsString();
+			auto size = serialized_string.size() * sizeof(std::string::value_type);
+			zmq::message_t request_msg(size);
+			std::memcpy(request_msg.data(), serialized_string.c_str(), size);
 
 			int retries_left = retry_count;
 			client.send(request_msg, zmq::send_flags::none);

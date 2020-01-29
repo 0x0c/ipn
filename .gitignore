@@ -2,6 +2,8 @@ example/publisher/publisher
 example/subscriber/subscriber
 example/service/service
 example/client/client
+**/ReqRep.pb.h
+**/ReqRep.pb.cc
 
 *.dylib
 
