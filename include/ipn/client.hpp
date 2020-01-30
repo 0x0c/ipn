@@ -15,14 +15,15 @@ namespace m2d
 {
 namespace ipn
 {
-	struct error_t
+	class error_t
 	{
+	public:
 		int err_no = 0;
 		std::string description = "";
 	};
 
 	template <typename Response>
-	class result_t : public std::enable_shared_from_this<result_t<Response>>
+	class result_t
 	{
 	public:
 		boost::optional<Response> response;
@@ -31,7 +32,7 @@ namespace ipn
 		    : response(response)
 		    , error(boost::none)
 		{
-			static_assert(std::is_base_of<google::protobuf::Message, Response>::value, "Response not derived from packable_message");
+			static_assert(std::is_base_of<google::protobuf::Message, Response>::value, "Response not derived from google::protobuf::Message");
 		}
 
 		result_t(error_t error)
@@ -42,7 +43,7 @@ namespace ipn
 	};
 
 	template <typename Request, typename Response>
-	class client : public std::enable_shared_from_this<client<Request, Response>>
+	class client
 	{
 	private:
 		static zmq::socket_t create_socket(zmq::context_t &context, std::string endpoint)
@@ -71,6 +72,8 @@ namespace ipn
 
 	public:
 		std::string endpoint;
+		std::function<void(zmq::error_t &e)> error_handler = nullptr;
+
 		client(const std::string &endpoint)
 		    : endpoint(ipn::rep_endpoint(endpoint))
 		{
@@ -87,40 +90,51 @@ namespace ipn
 			zmq::message_t request_msg(size);
 			std::memcpy(request_msg.data(), serialized_string.c_str(), size);
 
-			int retries_left = retry_count;
-			client.send(request_msg, zmq::send_flags::none);
+			try {
+				int retries_left = retry_count;
+				client.send(request_msg, zmq::send_flags::none);
+				while (true) {
+					//  Poll socket for a reply, with timeout
+					zmq::pollitem_t items[] = {
+						{ static_cast<void *>(client), 0, ZMQ_POLLIN, 0 }
+					};
+					zmq::poll(&items[0], 1, timeout_msec);
 
-			while (true) {
-				//  Poll socket for a reply, with timeout
-				zmq::pollitem_t items[] = {
-					{ static_cast<void *>(client), 0, ZMQ_POLLIN, 0 }
-				};
-				zmq::poll(&items[0], 1, timeout_msec);
+					//  If we got a reply, process it
+					if (items[0].revents & ZMQ_POLLIN) {
+						Response res;
+						auto result = receive(client, res);
+						error_t error;
+						if (result.value() == 0) {
+							error.err_no = -1;
+							error.description = "malformed reply from server.";
+							return result_t<Response>(error);
+						}
 
-				//  If we got a reply, process it
-				if (items[0].revents & ZMQ_POLLIN) {
-					Response res;
-					auto result = receive(client, res);
-					error_t error;
-					if (result.value() == 0) {
-						error.err_no = -1;
-						error.description = "malformed reply from server.";
+						return result_t<Response>(res);
+					}
+					else if (--retries_left == 0) {
+						error_t error;
+						error.err_no = -2;
+						error.description = "server seems to be offline, abandoning.";
+
 						return result_t<Response>(error);
 					}
-
-					return result_t<Response>(res);
+					else {
+						client = create_socket(*shared_ctx(), endpoint);
+						client.send(request_msg, zmq::send_flags::none);
+					}
 				}
-				else if (--retries_left == 0) {
-					error_t error;
-					error.err_no = -2;
-					error.description = "server seems to be offline, abandoning.";
-
-					return result_t<Response>(error);
+			} catch (zmq::error_t &e) {
+				if (e.num() != ETERM) {
+					if (error_handler != nullptr) {
+						error_handler(e);
+					}
 				}
-				else {
-					client = create_socket(*shared_ctx(), endpoint);
-					client.send(request_msg, zmq::send_flags::none);
-				}
+				error_t error;
+				error.err_no = e.num();
+				error.description = e.what();
+				return result_t<Response>(error);
 			}
 		}
 	};

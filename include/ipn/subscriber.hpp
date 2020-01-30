@@ -1,8 +1,6 @@
 #pragma once
 
-#include <algorithm>
 #include <functional>
-#include <random>
 #include <thread>
 
 #include <google/protobuf/message.h>
@@ -25,37 +23,34 @@ namespace ipn
 		std::function<void(zmq::error_t &e)> error_handler;
 
 		subscriber(const std::string &endpoint)
-		    : endpoint_(endpoint)
+		    : endpoint_(ipn::pub_endpoint(endpoint))
 		{
 			static_assert(std::is_base_of<google::protobuf::Message, T>::value, "T not derived from google::protobuf::Message");
 		}
 
 		std::string subscribe(const std::string &topic, std::function<void(T)> handler)
 		{
-			std::string hash;
-			static std::string chars = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789,./;'[]-=<>?:{}|_+";
-			static std::random_device rnd;
-			static std::mt19937 mt(rnd());
-			static std::uniform_int_distribution<> idx(0, 32);
-			for (int i = 0; i < 32; ++i) {
-				hash += chars[idx(mt)];
-			}
-			disposed_.insert(std::make_pair(hash, false));
+			auto unique_identifier = ipn::unique_identifier();
+			disposed_.insert(std::make_pair(unique_identifier, false));
 
 			std::function<void(zmq::error_t & e)> e_handler = error_handler;
 			std::thread t([=] {
 				std::weak_ptr<subscriber<T>> weak_this = this->shared_from_this();
-				zmq::socket_t sub(*shared_ctx(), zmq::socket_type::sub);
-				sub.connect(pub_endpoint(this->endpoint_));
-				sub.setsockopt(ZMQ_SUBSCRIBE, topic.c_str(), topic.size());
+				auto shared_this = weak_this.lock();
+				if (!shared_this) {
+					return;
+				}
 
 				try {
-					while (weak_this.expired() == false && this->is_disposed(hash) == false) {
+					zmq::socket_t sub(*shared_ctx(), zmq::socket_type::sub);
+					sub.connect(shared_this->endpoint_);
+					sub.setsockopt(ZMQ_SUBSCRIBE, topic.c_str(), topic.size());
+					while (shared_this->is_disposed(unique_identifier) == false) {
 						zmq::message_t topic_msg, data_msg;
 						sub.recv(topic_msg);
 						sub.recv(data_msg);
 
-						if (weak_this.expired() || this->is_disposed(hash)) {
+						if (shared_this->is_disposed(unique_identifier)) {
 							break;
 						}
 
@@ -68,7 +63,6 @@ namespace ipn
 							handler(data);
 						}
 					}
-					std::cout << "dispose or expired" << std::endl;
 				} catch (zmq::error_t &e) {
 					if (e.num() != ETERM) {
 						if (e_handler != nullptr) {
@@ -79,30 +73,30 @@ namespace ipn
 			});
 			t.detach();
 
-			return hash;
+			return unique_identifier;
 		}
 
-		void dispose(std::string hash)
+		void dispose(std::string unique_identifier)
 		{
-			auto it = disposed_.find(hash);
+			auto it = disposed_.find(unique_identifier);
 			if (it != disposed_.end()) {
 				disposed_.erase(it);
-				disposed_.insert(std::make_pair(hash, true));
+				disposed_.insert(std::make_pair(unique_identifier, true));
 			}
 		}
 
 		void dispose_all()
 		{
 			for (auto it = disposed_.begin(); it != disposed_.end(); ++it) {
-				auto hash = it->first;
+				auto unique_identifier = it->first;
 				disposed_.erase(it);
-				disposed_.insert(std::make_pair(hash, true));
+				disposed_.insert(std::make_pair(unique_identifier, true));
 			}
 		}
 
-		bool is_disposed(std::string hash)
+		bool is_disposed(std::string unique_identifier)
 		{
-			auto it = disposed_.find(hash);
+			auto it = disposed_.find(unique_identifier);
 			if (it != disposed_.end()) {
 				return it->second;
 			}

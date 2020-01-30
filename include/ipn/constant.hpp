@@ -1,5 +1,8 @@
 #pragma once
 
+#include <algorithm>
+#include <random>
+
 #include <zmq.hpp>
 
 namespace m2d
@@ -9,6 +12,19 @@ namespace ipn
 	namespace topic
 	{
 		static const std::string all = "";
+	}
+
+	static inline const std::string unique_identifier()
+	{
+		std::string unique_identifier;
+		static std::string chars = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789,./;'[]-=<>?:{}|_+";
+		static std::random_device rnd;
+		static std::mt19937 mt(rnd());
+		static std::uniform_int_distribution<> idx(0, 32);
+		for (int i = 0; i < 32; ++i) {
+			unique_identifier += chars[idx(mt)];
+		}
+		return unique_identifier;
 	}
 
 	static zmq::context_t *shared_ctx()
