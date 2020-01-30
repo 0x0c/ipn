@@ -37,8 +37,8 @@ namespace ipn
 			if (running_) {
 				return false;
 			}
+			std::weak_ptr<service<Request, Response>> weak_this = this->shared_from_this();
 			std::thread t([=] {
-				std::weak_ptr<service<Request, Response>> weak_this = this->shared_from_this();
 				try {
 					auto shared_this = weak_this.lock();
 					if (!shared_this) {

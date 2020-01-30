@@ -34,8 +34,8 @@ namespace ipn
 			disposed_.insert(std::make_pair(unique_identifier, false));
 
 			std::function<void(zmq::error_t & e)> e_handler = error_handler;
+			std::weak_ptr<subscriber<T>> weak_this = this->shared_from_this();
 			std::thread t([=] {
-				std::weak_ptr<subscriber<T>> weak_this = this->shared_from_this();
 				auto shared_this = weak_this.lock();
 				if (!shared_this) {
 					return;

@@ -84,7 +84,7 @@ namespace ipn
 
 		result_t<Response> send(const Request &request, int timeout_msec = 500, int retry_count = 1)
 		{
-			zmq::socket_t client = create_socket(*shared_ctx(), endpoint);
+			zmq::socket_t client = create_socket(*shared_ctx(), endpoint_);
 			// pack to zmq::message_t
 			auto serialized_string = request.SerializeAsString();
 			auto size = serialized_string.size() * sizeof(std::string::value_type);
@@ -122,7 +122,7 @@ namespace ipn
 						return result_t<Response>(error);
 					}
 					else {
-						client = create_socket(*shared_ctx(), endpoint);
+						client = create_socket(*shared_ctx(), endpoint_);
 						client.send(request_msg, zmq::send_flags::none);
 					}
 				}
