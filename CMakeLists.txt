@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15.2)
 add_definitions("-Wall")
 set(CMAKE_CXX_STANDARD 11)
 
-project(ipn VERSION 0.0.1 DESCRIPTION "inter-process notification")
+project(ipn VERSION 0.0.3 DESCRIPTION "inter-process notification")
 add_library(ipn INTERFACE)
 
 include_directories("${CMAKE_SOURCE_DIR}/include")
@@ -13,7 +13,6 @@ find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 
 target_include_directories(ipn INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
-target_link_libraries(ipn ${msgpack_LIBRARIES})
 
 include(GNUInstallDirs)
 install(TARGETS ipn

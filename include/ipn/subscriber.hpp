@@ -19,13 +19,19 @@ namespace ipn
 		std::string endpoint_;
 		std::map<std::string, bool> disposed_;
 
-	public:
-		std::function<void(zmq::error_t &e)> error_handler;
-
 		subscriber(const std::string &endpoint)
 		    : endpoint_(ipn::pub_endpoint(endpoint))
 		{
 			static_assert(std::is_base_of<google::protobuf::Message, T>::value, "T not derived from google::protobuf::Message");
+		}
+
+	public:
+		std::function<void(zmq::error_t &e)> error_handler;
+
+		static std::shared_ptr<subscriber<T>> create(const std::string &endpoint)
+		{
+			auto sub = new subscriber<T>(endpoint);
+			return std::shared_ptr<subscriber<T>>(sub);
 		}
 
 		std::string subscribe(const std::string &topic, std::function<void(T)> handler)
@@ -34,8 +40,8 @@ namespace ipn
 			disposed_.insert(std::make_pair(unique_identifier, false));
 
 			std::function<void(zmq::error_t & e)> e_handler = error_handler;
+			std::weak_ptr<subscriber<T>> weak_this = this->shared_from_this();
 			std::thread t([=] {
-				std::weak_ptr<subscriber<T>> weak_this = this->shared_from_this();
 				auto shared_this = weak_this.lock();
 				if (!shared_this) {
 					return;

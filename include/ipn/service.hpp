@@ -22,9 +22,6 @@ namespace ipn
 		bool disposed_ = false;
 		bool running_ = false;
 
-	public:
-		std::function<void(zmq::error_t &e)> error_handler;
-
 		service(const std::string &endpoint)
 		    : endpoint_(ipn::rep_endpoint(endpoint))
 		{
@@ -32,13 +29,22 @@ namespace ipn
 			static_assert(std::is_base_of<google::protobuf::Message, Response>::value, "Response not derived from google::protobuf::Message");
 		}
 
+	public:
+		std::function<void(zmq::error_t &e)> error_handler;
+
+		static std::shared_ptr<service<Request, Response>> create(const std::string &endpoint)
+		{
+			auto serv = new service<Request, Response>(endpoint);
+			return std::shared_ptr<service<Request, Response>>(serv);
+		}
+
 		bool run(std::function<Response(Request &)> handler)
 		{
 			if (running_) {
 				return false;
 			}
+			std::weak_ptr<service<Request, Response>> weak_this = this->shared_from_this();
 			std::thread t([=] {
-				std::weak_ptr<service<Request, Response>> weak_this = this->shared_from_this();
 				try {
 					auto shared_this = weak_this.lock();
 					if (!shared_this) {

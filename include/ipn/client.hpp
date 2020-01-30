@@ -46,6 +46,8 @@ namespace ipn
 	class client
 	{
 	private:
+		std::string endpoint_;
+
 		static zmq::socket_t create_socket(zmq::context_t &context, std::string endpoint)
 		{
 			zmq::socket_t client(context, ZMQ_REQ);
@@ -71,11 +73,10 @@ namespace ipn
 		}
 
 	public:
-		std::string endpoint;
 		std::function<void(zmq::error_t &e)> error_handler = nullptr;
 
 		client(const std::string &endpoint)
-		    : endpoint(ipn::rep_endpoint(endpoint))
+		    : endpoint_(ipn::rep_endpoint(endpoint))
 		{
 			static_assert(std::is_base_of<google::protobuf::Message, Response>::value, "Response not derived from google::protobuf::Message");
 			static_assert(std::is_base_of<google::protobuf::Message, Request>::value, "Request not derived from google::protobuf::Message");
@@ -83,7 +84,7 @@ namespace ipn
 
 		result_t<Response> send(const Request &request, int timeout_msec = 500, int retry_count = 1)
 		{
-			zmq::socket_t client = create_socket(*shared_ctx(), endpoint);
+			zmq::socket_t client = create_socket(*shared_ctx(), endpoint_);
 			// pack to zmq::message_t
 			auto serialized_string = request.SerializeAsString();
 			auto size = serialized_string.size() * sizeof(std::string::value_type);
@@ -121,7 +122,7 @@ namespace ipn
 						return result_t<Response>(error);
 					}
 					else {
-						client = create_socket(*shared_ctx(), endpoint);
+						client = create_socket(*shared_ctx(), endpoint_);
 						client.send(request_msg, zmq::send_flags::none);
 					}
 				}
