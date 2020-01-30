@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 		echo_service.run([](example::request &req) {
 			std::cout << "request: " << req.message() << std::endl;
 			example::response response;
-			response.set_message(req.message());
+			response.set_message("echo " + req.message());
 			return response;
 		});
 	} catch (std::exception &e) {

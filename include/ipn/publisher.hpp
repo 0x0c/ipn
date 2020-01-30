@@ -13,7 +13,7 @@ namespace m2d
 namespace ipn
 {
 	template <typename T>
-	class publisher
+	class publisher : public std::enable_shared_from_this<publisher<T>>
 	{
 	private:
 		zmq::socket_t pub;

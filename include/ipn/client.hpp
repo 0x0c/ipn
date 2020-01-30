@@ -22,7 +22,7 @@ namespace ipn
 	};
 
 	template <typename Response>
-	class result_t
+	class result_t : public std::enable_shared_from_this<result_t<Response>>
 	{
 	public:
 		boost::optional<Response> response;
@@ -42,7 +42,7 @@ namespace ipn
 	};
 
 	template <typename Request, typename Response>
-	class client
+	class client : public std::enable_shared_from_this<client<Request, Response>>
 	{
 	private:
 		static zmq::socket_t create_socket(zmq::context_t &context, std::string endpoint)

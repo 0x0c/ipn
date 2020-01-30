@@ -15,7 +15,7 @@ namespace m2d
 namespace ipn
 {
 	template <typename Request, typename Response>
-	class service
+	class service : public std::enable_shared_from_this<service<Request, Response>>
 	{
 	private:
 		std::string endpoint;
