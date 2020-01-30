@@ -46,6 +46,8 @@ namespace ipn
 	class client
 	{
 	private:
+		std::string endpoint_;
+
 		static zmq::socket_t create_socket(zmq::context_t &context, std::string endpoint)
 		{
 			zmq::socket_t client(context, ZMQ_REQ);
@@ -71,11 +73,10 @@ namespace ipn
 		}
 
 	public:
-		std::string endpoint;
 		std::function<void(zmq::error_t &e)> error_handler = nullptr;
 
 		client(const std::string &endpoint)
-		    : endpoint(ipn::rep_endpoint(endpoint))
+		    : endpoint_(ipn::rep_endpoint(endpoint))
 		{
 			static_assert(std::is_base_of<google::protobuf::Message, Response>::value, "Response not derived from google::protobuf::Message");
 			static_assert(std::is_base_of<google::protobuf::Message, Request>::value, "Request not derived from google::protobuf::Message");
