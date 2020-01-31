@@ -35,10 +35,10 @@ namespace ipn
 		static std::shared_ptr<service<Request, Response>> create(const std::string &endpoint)
 		{
 			auto serv = new service<Request, Response>(endpoint);
-			return std::shared_ptr<service<Request, Response>>(serv);
+			return std::move(std::shared_ptr<service<Request, Response>>(serv));
 		}
 
-		bool run(std::function<Response(Request &)> handler)
+		bool run(std::function<Response(boost::optional<Request> &)> handler)
 		{
 			if (running_) {
 				return false;
@@ -62,10 +62,18 @@ namespace ipn
 							Request req;
 							auto data_msg = static_cast<const char *>(msg.data());
 							std::string data_str(data_msg, msg.size());
-							req.ParseFromString(data_str);
 
-							auto res = handler(req);
+							if (req.ParseFromString(data_str) == false) {
+								auto res = handler(boost::none);
+								auto serialized_string = res.SerializeAsString();
+								auto size = serialized_string.size() * sizeof(std::string::value_type);
+								zmq::message_t reply_msg(size);
+								std::memcpy(reply_msg.data(), serialized_string.c_str(), size);
+								rep.send(reply_msg, zmq::send_flags::none);
+								continue;
+							}
 
+							auto res = handler(boost::optional<Request>(req));
 							// pack to zmq::message_t
 							auto serialized_string = res.SerializeAsString();
 							auto size = serialized_string.size() * sizeof(std::string::value_type);
