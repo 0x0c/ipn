@@ -65,10 +65,12 @@ namespace ipn
 
 						T data;
 						if (data.ParseFromString(data_str)) {
-							// TODO: throw
+							if (handler != nullptr) {
+								handler(data);
+							}
 						}
-						if (handler != nullptr) {
-							handler(data);
+						else {
+							// TODO: throw
 						}
 					}
 				} catch (zmq::error_t &e) {

@@ -38,7 +38,7 @@ namespace ipn
 			return std::move(std::shared_ptr<service<Request, Response>>(serv));
 		}
 
-		bool run(std::function<Response(boost::optional<Request> &)> handler)
+		bool run(std::function<Response(boost::optional<Request>)> handler)
 		{
 			if (running_) {
 				return false;
