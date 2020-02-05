@@ -7,6 +7,7 @@
 #include <zmq.hpp>
 
 #include "constant.hpp"
+#include "error.hpp"
 
 namespace m2d
 {
@@ -26,7 +27,7 @@ namespace ipn
 		}
 
 	public:
-		std::function<void(zmq::error_t &e)> error_handler;
+		std::function<void(ipn::error_t &e)> error_handler;
 
 		static std::shared_ptr<subscriber<T>> create(const std::string &endpoint)
 		{
@@ -39,7 +40,7 @@ namespace ipn
 			auto unique_identifier = ipn::unique_identifier();
 			disposed_.insert(std::make_pair(unique_identifier, false));
 
-			std::function<void(zmq::error_t & e)> e_handler = error_handler;
+			std::function<void(ipn::error_t & e)> e_handler = error_handler;
 			std::weak_ptr<subscriber<T>> weak_this = this->shared_from_this();
 			std::thread t([=] {
 				auto shared_this = weak_this.lock();
@@ -70,14 +71,25 @@ namespace ipn
 							}
 						}
 						else {
-							// TODO: throw
+							ipn::error_t e;
+							e.err_no = error_t::error_no::parse_error;
+							e.description = "Could not parse the received data to protobuf message.";
+							throw e;
 						}
 					}
-				} catch (zmq::error_t &e) {
-					if (e.num() != ETERM) {
+				} catch (zmq::error_t &zmq_error) {
+					if (zmq_error.num() != ETERM) {
 						if (e_handler != nullptr) {
+							ipn::error_t e;
+							e.err_no = error_t::error_no::catch_zmq_error;
+							e.zmq_error = zmq_error;
+							e.description = zmq_error.what();
 							e_handler(e);
 						}
+					}
+				} catch (ipn::error_t &e) {
+					if (e_handler != nullptr) {
+						e_handler(e);
 					}
 				}
 			});
