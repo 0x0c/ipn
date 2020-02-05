@@ -10,27 +10,12 @@
 #include <zmq.hpp>
 
 #include "constant.hpp"
+#include "error.hpp"
 
 namespace m2d
 {
 namespace ipn
 {
-	class error_t
-	{
-	public:
-		enum error_no
-		{
-			no_error,
-			parse_error,
-			invalid_response,
-			catch_zmq_error
-		};
-
-		int err_no = 0;
-		zmq::error_t zmq_error;
-		std::string description = "";
-	};
-
 	template <typename Response>
 	class result_t
 	{
@@ -79,21 +64,21 @@ namespace ipn
 						error_t e;
 						e.err_no = error_t::error_no::parse_error;
 						e.description = "Could not parse the received data to protobuf message.";
-						return boost::optional<error_t>(e);
+						return boost::optional<error_t>(std::move(e));
 					}
 				}
 				else {
 					error_t e;
 					e.err_no = error_t::error_no::invalid_response;
 					e.description = "No bytes received.";
-					return boost::optional<error_t>(e);
+					return boost::optional<error_t>(std::move(e));
 				}
 			} catch (zmq::error_t zmq_error) {
 				error_t e;
 				e.err_no = error_t::error_no::catch_zmq_error;
 				e.description = zmq_error.what();
 				e.zmq_error = zmq_error;
-				return boost::optional<error_t>(e);
+				return boost::optional<error_t>(std::move(e));
 			}
 
 			return boost::none;
@@ -130,17 +115,17 @@ namespace ipn
 					Response res;
 					auto error = receive(client, res);
 					if (error) {
-						return result_t<Response>(*error);
+						return result_t<Response>(std::move(*error));
 					}
 
-					return result_t<Response>(res);
+					return result_t<Response>(std::move(res));
 				}
 				else if (--retries_left == 0) {
 					error_t error;
 					error.err_no = -2;
 					error.description = "server seems to be offline, abandoning.";
 
-					return result_t<Response>(error);
+					return result_t<Response>(std::move(error));
 				}
 				else {
 					client = create_socket(*shared_ctx(), endpoint_);

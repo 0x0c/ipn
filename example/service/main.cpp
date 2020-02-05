@@ -15,10 +15,17 @@ int main(int argc, char *argv[])
 		}
 
 		auto echo_service = ipn::service<example::request, example::response>::create(argv[1]);
-		echo_service->run([](example::request &req) {
-			std::cout << "request: " << req.message() << std::endl;
+		echo_service->run([](boost::optional<example::request> req) {
+			if (req) {
+				std::cout << "request: " << (*req).message() << std::endl;
+				example::response response;
+				response.set_message("echo " + (*req).message());
+				return response;
+			}
+
+			std::cout << "Invalid request" << std::endl;
 			example::response response;
-			response.set_message("echo " + req.message());
+			response.set_message("error: invalid request");
 			return response;
 		});
 
