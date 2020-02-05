@@ -31,7 +31,7 @@ namespace ipn
 		static std::shared_ptr<subscriber<T>> create(const std::string &endpoint)
 		{
 			auto sub = new subscriber<T>(endpoint);
-			return std::shared_ptr<subscriber<T>>(sub);
+			return std::move(std::shared_ptr<subscriber<T>>(sub));
 		}
 
 		std::string subscribe(const std::string &topic, std::function<void(T)> handler)
@@ -64,7 +64,9 @@ namespace ipn
 						const std::string data_str(static_cast<const char *>(data_msg.data()), data_msg.size());
 
 						T data;
-						data.ParseFromString(data_str);
+						if (data.ParseFromString(data_str)) {
+							// TODO: throw
+						}
 						if (handler != nullptr) {
 							handler(data);
 						}

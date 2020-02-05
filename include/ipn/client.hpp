@@ -18,7 +18,16 @@ namespace ipn
 	class error_t
 	{
 	public:
+		enum error_no
+		{
+			no_error,
+			parse_error,
+			invalid_response,
+			catch_zmq_error
+		};
+
 		int err_no = 0;
+		zmq::error_t zmq_error;
 		std::string description = "";
 	};
 
@@ -50,7 +59,7 @@ namespace ipn
 
 		static zmq::socket_t create_socket(zmq::context_t &context, std::string endpoint)
 		{
-			zmq::socket_t client(context, ZMQ_REQ);
+			zmq::socket_t client(context, zmq::socket_type::req);
 			client.connect(endpoint);
 
 			//  Configure socket to not wait at close time
@@ -59,22 +68,38 @@ namespace ipn
 			return client;
 		}
 
-		zmq::detail::recv_result_t receive(zmq::socket_t &client, Response &data)
+		boost::optional<error_t> receive(zmq::socket_t &client, Response &data)
 		{
-			zmq::message_t data_msg;
-			auto result = client.recv(data_msg);
-			auto parsed = false;
-			if (result.value()) {
-				const std::string data_str(static_cast<const char *>(data_msg.data()), data_msg.size());
-				parsed = data.ParseFromString(data_str);
+			try {
+				zmq::message_t data_msg;
+				auto result = client.recv(data_msg);
+				if (result.value()) {
+					const std::string data_str(static_cast<const char *>(data_msg.data()), data_msg.size());
+					if (data.ParseFromString(data_str) == false) {
+						error_t e;
+						e.err_no = error_t::error_no::parse_error;
+						e.description = "Could not parse the received data to protobuf message.";
+						return boost::optional<error_t>(e);
+					}
+				}
+				else {
+					error_t e;
+					e.err_no = error_t::error_no::invalid_response;
+					e.description = "No bytes received.";
+					return boost::optional<error_t>(e);
+				}
+			} catch (zmq::error_t zmq_error) {
+				error_t e;
+				e.err_no = error_t::error_no::catch_zmq_error;
+				e.description = zmq_error.what();
+				e.zmq_error = zmq_error;
+				return boost::optional<error_t>(e);
 			}
 
-			return (result.value() > 0) & parsed;
+			return boost::none;
 		}
 
 	public:
-		std::function<void(zmq::error_t &e)> error_handler = nullptr;
-
 		client(const std::string &endpoint)
 		    : endpoint_(ipn::rep_endpoint(endpoint))
 		{
@@ -91,51 +116,36 @@ namespace ipn
 			zmq::message_t request_msg(size);
 			std::memcpy(request_msg.data(), serialized_string.c_str(), size);
 
-			try {
-				int retries_left = retry_count;
-				client.send(request_msg, zmq::send_flags::none);
-				while (true) {
-					//  Poll socket for a reply, with timeout
-					zmq::pollitem_t items[] = {
-						{ static_cast<void *>(client), 0, ZMQ_POLLIN, 0 }
-					};
-					zmq::poll(&items[0], 1, timeout_msec);
+			int retries_left = retry_count;
+			client.send(request_msg, zmq::send_flags::none);
+			while (true) {
+				//  Poll socket for a reply, with timeout
+				zmq::pollitem_t items[] = {
+					{ static_cast<void *>(client), 0, ZMQ_POLLIN, 0 }
+				};
+				zmq::poll(&items[0], 1, timeout_msec);
 
-					//  If we got a reply, process it
-					if (items[0].revents & ZMQ_POLLIN) {
-						Response res;
-						auto result = receive(client, res);
-						error_t error;
-						if (result.value() == 0) {
-							error.err_no = -1;
-							error.description = "malformed reply from server.";
-							return result_t<Response>(error);
-						}
+				//  If we got a reply, process it
+				if (items[0].revents & ZMQ_POLLIN) {
+					Response res;
+					auto error = receive(client, res);
+					if (error) {
+						return result_t<Response>(*error);
+					}
 
-						return result_t<Response>(res);
-					}
-					else if (--retries_left == 0) {
-						error_t error;
-						error.err_no = -2;
-						error.description = "server seems to be offline, abandoning.";
-
-						return result_t<Response>(error);
-					}
-					else {
-						client = create_socket(*shared_ctx(), endpoint_);
-						client.send(request_msg, zmq::send_flags::none);
-					}
+					return result_t<Response>(res);
 				}
-			} catch (zmq::error_t &e) {
-				if (e.num() != ETERM) {
-					if (error_handler != nullptr) {
-						error_handler(e);
-					}
+				else if (--retries_left == 0) {
+					error_t error;
+					error.err_no = -2;
+					error.description = "server seems to be offline, abandoning.";
+
+					return result_t<Response>(error);
 				}
-				error_t error;
-				error.err_no = e.num();
-				error.description = e.what();
-				return result_t<Response>(error);
+				else {
+					client = create_socket(*shared_ctx(), endpoint_);
+					client.send(request_msg, zmq::send_flags::none);
+				}
 			}
 		}
 	};
