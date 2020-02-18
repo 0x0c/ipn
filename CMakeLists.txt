@@ -7,8 +7,12 @@ add_library(ipn INTERFACE)
 
 include_directories("${CMAKE_SOURCE_DIR}/include")
 
+if (APPLE)
+find_package(boost 1.70.0 REQUIRED)
+else()
+find_package(Boost 1.70.0 REQUIRED)
+endif()
 find_package(cppzmq REQUIRED)
-find_package(boost REQUIRED)
 find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 
