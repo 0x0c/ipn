@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15.0)
 add_definitions("-Wall")
 set(CMAKE_CXX_STANDARD 11)
 
-project(ipn VERSION 0.0.6 DESCRIPTION "inter-process notification")
+project(ipn VERSION 0.0.7 DESCRIPTION "inter-process notification")
 add_library(ipn INTERFACE)
 
 include_directories("${CMAKE_SOURCE_DIR}/include")
