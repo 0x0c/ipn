@@ -3,7 +3,6 @@
 #include <functional>
 
 #include <google/protobuf/message.h>
-#include <msgpack.hpp>
 #include <zmq.hpp>
 
 #include "constant.hpp"
