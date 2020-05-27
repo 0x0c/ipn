@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <thread>
+#include <map>
 
 #include <google/protobuf/message.h>
 #include <zmq.hpp>
